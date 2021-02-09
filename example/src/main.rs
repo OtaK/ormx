@@ -1,7 +1,7 @@
 // #![feature(trace_macros)]
 use chrono::{NaiveDateTime, Utc};
 use ormx::{Insert, Table};
-use sqlx::PgPool;
+use sqlx::MySqlPool;
 
 // trace_macros!(true);
 
@@ -17,7 +17,9 @@ async fn main() -> anyhow::Result<()> {
         .with_level(log::LevelFilter::Info)
         .init()?;
 
-    let db = PgPool::connect(&dotenv::var("DATABASE_URL")?).await?;
+    let db = MySqlPool::connect(&dotenv::var("DATABASE_URL")?).await?;
+
+    User::sync_safe(&db).await?;
 
     log::info!("insert a new row into the database");
     let mut new = InsertUser {
@@ -63,23 +65,38 @@ async fn main() -> anyhow::Result<()> {
 }
 
 #[derive(Debug, ormx::Table)]
-#[ormx(table = "users", id = user_id, insertable)]
+#[ormx(
+    table = "users",
+    id = user_id,
+    insertable,
+    syncable,
+    engine = "InnoDB",
+    charset = "utf8mb4",
+    collation = "utf8mb4_general_ci",
+)]
 struct User {
     // map this field to the column "id"
     #[ormx(column = "id")]
     #[ormx(get_one = get_by_user_id)]
-    user_id: i32,
+    #[ormx(column_type = "INTEGER UNSIGNED", primary_key)]
+    user_id: u32,
+    #[ormx(column_type = "VARCHAR(255) NOT NULL")]
     first_name: String,
+    #[ormx(column_type = "VARCHAR(255) NOT NULL")]
     last_name: String,
     // generate `User::by_email(&str) -> Result<Option<Self>>`
     #[ormx(get_optional(&str))]
+    #[ormx(column_type = "VARCHAR(255) NOT NULL")]
     email: String,
     #[ormx(custom_type)]
+    #[ormx(column_type = "ENUM('user', 'admin') NOT NULL DEFAULT 'user'")]
     role: Role,
+    #[ormx(column_type = "VARCHAR(255) DEFAULT NULL")]
     disabled: Option<String>,
     // don't include this field into `InsertUser` since it has a default value
     // generate `User::set_last_login(Option<NaiveDateTime>) -> Result<()>`
-    #[ormx(default, set)]
+    #[ormx(default = "NULL", set)]
+    #[ormx(column_type = "DATETIME")]
     last_login: Option<NaiveDateTime>,
 }
 

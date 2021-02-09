@@ -153,6 +153,12 @@ where
     ) -> BoxFuture<'a, Result<()>> {
         Self::delete_row(db, self.id())
     }
+
+    fn sync_safe<'a, 'c: 'a>(
+        _db: impl Executor<'c, Database = Db> + 'a,
+    ) -> BoxFuture<'a, Result<()>> {
+        Box::pin(async move { Ok(()) })
+    }
 }
 
 /// A type which can be used to "patch" a row, updating multiple fields at once.
@@ -163,7 +169,7 @@ where
     type Table: Table;
 
     /// Applies the data of this patch to the given entity.
-    /// This does not persist the change in the database.  
+    /// This does not persist the change in the database.
     fn apply_to(self, entity: &mut Self::Table);
 
     /// Applies this patch to a row in the database.

@@ -1,14 +1,24 @@
-use syn::parse::{Parse, ParseStream};
-use syn::punctuated::Punctuated;
-use syn::{Attribute, Ident, Path, Result, Token, Type};
+use syn::{
+    Attribute, Ident, Path, Result, Token, Type,
+    parse::{Parse, ParseStream},
+    punctuated::Punctuated,
+};
 
 pub enum TableAttr {
-    // table = <string>
+    /// table = <string>
     Table(String),
-    // id = <ident>
+    /// id = <ident>
     Id(Ident),
-    // insertable [= [<attribute>]* <ident>]?
+    /// insertable [= [<attribute>]* <ident>]?
     Insertable(Option<Insertable>),
+    /// engine = <string>
+    Engine(String),
+    /// charset = <string>
+    Charset(String),
+    /// collation = <string>
+    Collation(String),
+    /// syncable
+    Syncable(())
 }
 
 pub struct Insertable {
@@ -17,19 +27,23 @@ pub struct Insertable {
 }
 
 pub enum TableFieldAttr {
-    // column = <string>
+    /// column = <string>
     Column(String),
-    // custom_type
+    /// column_type = <string>
+    ColumnType(String),
+    /// custom_type
     CustomType(()),
-    // default
-    Default(()),
-    // get_one [= <ident>]? [(<type>)]?
+    /// primary_key
+    PrimaryKey(()),
+    /// default = <string>
+    Default(String),
+    /// get_one [= <ident>]? [(<type>)]?
     GetOne(Getter),
-    // get_optional [= <ident>]? [(<type>)]?
+    /// get_optional [= <ident>]? [(<type>)]?
     GetOptional(Getter),
-    // get_many [= <ident>]? [(<type>)]?
+    /// get_many [= <ident>]? [(<type>)]?
     GetMany(Getter),
-    // set [= <ident>]?
+    /// set [= <ident>]?
     Set(Option<Ident>),
 }
 
@@ -133,17 +147,23 @@ macro_rules! impl_parse {
 impl_parse!(TableAttr {
     "table" => Table(= String),
     "id" => Id(= Ident),
-    "insertable" => Insertable((= Insertable)?)
+    "insertable" => Insertable((= Insertable)?),
+    "engine" => Engine(= String),
+    "charset" => Charset(= String),
+    "collation" => Collation(= String),
+    "syncable" => Syncable()
 });
 
 impl_parse!(TableFieldAttr {
     "column" => Column(= String),
+    "column_type" => ColumnType(= String),
     "get_one" => GetOne(Getter),
     "get_optional" => GetOptional(Getter),
     "get_many" => GetMany(Getter),
     "set" => Set((= Ident)?),
     "custom_type" => CustomType(),
-    "default" => Default()
+    "primary_key" => PrimaryKey(),
+    "default" => Default(= String)
 });
 
 impl_parse!(PatchAttr {

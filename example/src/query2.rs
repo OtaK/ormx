@@ -1,8 +1,8 @@
 use crate::User;
-use sqlx::PgPool;
+use sqlx::MySqlPool;
 
 pub(crate) async fn query_users(
-    db: &PgPool,
+    db: &MySqlPool,
     filter: Option<&str>,
     limit: Option<usize>,
 ) -> anyhow::Result<Vec<User>> {

@@ -15,6 +15,7 @@ pub fn impl_table<B: Backend>(table: &Table<B>) -> TokenStream {
     let stream_all_paginated = stream_all_paginated::<B>(table, &column_list);
     let update = update::<B>(table);
     let delete = delete::<B>(table);
+    let sync_safe = sync_safe::<B>(table);
 
     quote! {
         impl ormx::Table for #table_ident {
@@ -27,6 +28,38 @@ pub fn impl_table<B: Backend>(table: &Table<B>) -> TokenStream {
             #stream_all_paginated
             #update
             #delete
+            #sync_safe
+        }
+    }
+}
+
+fn sync_safe<B: Backend>(table: &Table<B>) -> TokenStream {
+    if !table.syncable {
+        return TokenStream::default();
+    }
+
+    let box_future = crate::utils::box_future();
+    let sync_sql = format!(
+        "CREATE TABLE IF NOT EXISTS {quote}{}{quote} ({}){}{}{}",
+        table.table,
+        table.create_column_list(),
+        table.engine.as_ref().map(|e| format!(" ENGINE={}", e)).unwrap_or_default(),
+        table.charset.as_ref().map(|e| format!(" DEFAULT CHARSET={}", e)).unwrap_or_default(),
+        table.collation.as_ref().map(|e| format!(" DEFAULT COLLATE={}", e)).unwrap_or_default(),
+        quote = B::QUOTE,
+    );
+    println!("{}", sync_sql);
+    quote! {
+        fn sync_safe<'a, 'c: 'a>(
+            db: impl sqlx::Executor<'c, Database = ormx::Db> + 'a,
+        ) -> #box_future<'a, sqlx::Result<()>> {
+            Box::pin(async move {
+                sqlx::query!(#sync_sql)
+                    .execute(db)
+                    .await?;
+
+                Ok(())
+            })
         }
     }
 }
@@ -34,11 +67,12 @@ pub fn impl_table<B: Backend>(table: &Table<B>) -> TokenStream {
 fn get<B: Backend>(table: &Table<B>, column_list: &str) -> TokenStream {
     let box_future = crate::utils::box_future();
     let get_sql = format!(
-        "SELECT {} FROM {} WHERE {} = {}",
+        "SELECT {} FROM {quote}{}{quote} WHERE {} = {}",
         column_list,
         table.table,
         table.id.column(),
-        B::Bindings::default().next().unwrap()
+        B::Bindings::default().next().unwrap(),
+        quote = B::QUOTE,
     );
 
     quote! {

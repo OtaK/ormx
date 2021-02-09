@@ -30,7 +30,9 @@ impl<B: Backend> TryFrom<&syn::Field> for TableField<B> {
 
         none!(
             column,
+            column_type,
             custom_type,
+            primary,
             get_one,
             get_optional,
             get_many,
@@ -41,7 +43,9 @@ impl<B: Backend> TryFrom<&syn::Field> for TableField<B> {
         for attr in parse_attrs::<TableFieldAttr>(&value.attrs)? {
             match attr {
                 TableFieldAttr::Column(c) => set_once(&mut column, c)?,
+                TableFieldAttr::ColumnType(c) => set_once(&mut column_type, c)?,
                 TableFieldAttr::CustomType(..) => set_once(&mut custom_type, true)?,
+                TableFieldAttr::PrimaryKey(..) => set_once(&mut primary, true)?,
                 TableFieldAttr::GetOne(g) => set_once(&mut get_one, g)?,
                 TableFieldAttr::GetOptional(g) => set_once(&mut get_optional, g)?,
                 TableFieldAttr::GetMany(g) => set_once(&mut get_many, g)?,
@@ -49,20 +53,22 @@ impl<B: Backend> TryFrom<&syn::Field> for TableField<B> {
                     let default = || Ident::new(&format!("set_{}", ident), Span::call_site());
                     set_once(&mut set, s.unwrap_or_else(default))?
                 }
-                TableFieldAttr::Default(..) => set_once(&mut default, true)?,
+                TableFieldAttr::Default(c) => set_once(&mut default, c)?,
             }
         }
         Ok(TableField {
             column_name: column.unwrap_or_else(|| ident.to_string()),
             field: ident,
             ty: value.ty.clone(),
-            custom_type: custom_type.unwrap_or(false),
+            custom_type: custom_type.unwrap_or_default(),
+            primary: primary.unwrap_or_default(),
             reserved_ident,
-            default: default.unwrap_or(false),
+            default,
             get_one,
             get_optional,
             get_many,
             set,
+            column_type,
             _phantom: PhantomData,
         })
     }
@@ -83,7 +89,7 @@ impl<B: Backend> TryFrom<&syn::DeriveInput> for Table<B> {
             .map(TableField::try_from)
             .collect::<Result<Vec<_>>>()?;
 
-        none!(table, id, insertable);
+        none!(table, id, insertable, engine, charset, collation, syncable);
         for attr in parse_attrs::<TableAttr>(&value.attrs)? {
             match attr {
                 TableAttr::Table(x) => set_once(&mut table, x)?,
@@ -94,7 +100,11 @@ impl<B: Backend> TryFrom<&syn::DeriveInput> for Table<B> {
                         ident: Ident::new(&format!("Insert{}", value.ident), Span::call_site()),
                     };
                     set_once(&mut insertable, x.unwrap_or_else(default))?;
-                }
+                },
+                TableAttr::Engine(x) => set_once(&mut engine, x)?,
+                TableAttr::Charset(x) => set_once(&mut charset, x)?,
+                TableAttr::Collation(x) => set_once(&mut collation, x)?,
+                TableAttr::Syncable(..) => set_once(&mut syncable, true)?,
             }
         }
 
@@ -110,14 +120,14 @@ impl<B: Backend> TryFrom<&syn::DeriveInput> for Table<B> {
             })?
             .clone();
 
-        if id.default {
+        if id.default.is_some() {
             return Err(Error::new(
                 Span::call_site(),
                 "id field cannot be annotated with #[ormx(default)]",
             ));
         }
 
-        if insertable.is_none() && fields.iter().any(|field| field.default) {
+        if insertable.is_none() && fields.iter().any(|field| field.default.is_some()) {
             return Err(Error::new(
                 Span::call_site(),
                 "#[ormx(default)] has no effect without #[ormx(insertable = ..)]",
@@ -128,9 +138,13 @@ impl<B: Backend> TryFrom<&syn::DeriveInput> for Table<B> {
             ident: value.ident.clone(),
             vis: value.vis.clone(),
             table: table.ok_or_else(|| missing_attr("table"))?,
+            syncable: syncable.unwrap_or_default(),
             id,
             insertable,
             fields,
+            engine,
+            charset,
+            collation,
         })
     }
 }
