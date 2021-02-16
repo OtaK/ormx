@@ -1,4 +1,4 @@
-use std::convert::TryFrom;
+use std::{collections::HashMap, convert::{TryFrom}};
 
 use itertools::Itertools;
 use proc_macro2::{Ident, Span, TokenStream};
@@ -30,7 +30,11 @@ pub struct TableField<B: Backend> {
     pub field: Ident,
     pub ty: Type,
     pub column_name: String,
+    pub column_type: Option<String>,
     pub primary: bool,
+    pub auto_increment: bool,
+    pub allow_null: bool,
+    pub unique: Option<Option<String>>,
     pub custom_type: bool,
     pub reserved_ident: bool,
     pub default: Option<String>,
@@ -38,7 +42,6 @@ pub struct TableField<B: Backend> {
     pub get_optional: Option<Getter>,
     pub get_many: Option<Getter>,
     pub set: Option<Ident>,
-    pub column_type: Option<String>,
     pub _phantom: PhantomData<*const B>,
 }
 
@@ -64,10 +67,39 @@ impl<B: Backend> Table<B> {
     }
 
     pub fn create_column_list(&self) -> String {
+        let unique_clauses = self.fields.iter()
+            .filter(|field| field.unique.is_some())
+            .fold(HashMap::<String, Vec<&str>>::new(), |mut acc, field| {
+                let unique = field.unique.as_ref().unwrap();
+                let index_name = if let Some(index_name) = unique {
+                    index_name.clone()
+                } else {
+                    format!("{}_uniq", field.field.to_string())
+                };
+
+                acc
+                    .entry(index_name)
+                    .or_default()
+                    .push(&field.column_name);
+                acc
+            })
+            .into_iter()
+            .map(|(index_name, fields)| {
+                format!(
+                    "UNIQUE {quote}{}{quote} ({})",
+                    index_name,
+                    fields.into_iter().map(|field_name|
+                        format!("{quote}{}{quote}", field_name, quote = B::QUOTE)
+                    ).join(", "),
+                    quote = B::QUOTE,
+                )
+            });
+
         self.fields
             .iter()
             .map(TableField::fmt_for_create)
-            .join(", ")
+            .chain(unique_clauses)
+            .join(",\n")
     }
 }
 
@@ -93,11 +125,25 @@ impl<B: Backend> TableField<B> {
         }
 
         format!(
-            "{} {}{}{}",
-            self.column(),
+            "{quote}{}{quote} {}{}{}{}",
+            self.column_name,
             self.column_type.as_ref().unwrap(),
-            if self.primary { " PRIMARY KEY NOT NULL AUTO_INCREMENT" } else { "" },
+            if !self.allow_null {
+                " NOT NULL"
+            } else {
+                ""
+            },
+            if self.primary {
+                format!(" PRIMARY KEY NOT NULL{}", if self.auto_increment {
+                    " AUTO_INCREMENT"
+                } else {
+                    ""
+                })
+            } else {
+                "".into()
+            },
             self.default.as_ref().map(|d| format!(" DEFAULT {}", d)).unwrap_or_default(),
+            quote = B::QUOTE,
         )
     }
 

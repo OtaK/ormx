@@ -35,6 +35,12 @@ pub enum TableFieldAttr {
     CustomType(()),
     /// primary_key
     PrimaryKey(()),
+    /// auto_increment
+    AutoIncrement(()),
+    /// allow_null = <bool>
+    AllowNull(bool),
+    /// unique [= <string>]
+    Unique(Option<String>),
     /// default = <string>
     Default(String),
     /// get_one [= <ident>]? [(<type>)]?
@@ -140,7 +146,7 @@ macro_rules! impl_parse {
         (impl_parse!($x))(i)
     } );
     (String) => ( |i: ParseStream| i.parse().map(|s: syn::LitStr| s.value()) );
-    (bool) => ( |i: ParseStream| i.parse().map(|s: syn::LitBool| s.value()) );
+    (bool) => ( |i: ParseStream| i.parse().map(|s: syn::LitBool| s.value) );
     ($t:ty) => ( |i: ParseStream| i.parse::<$t>() );
 }
 
@@ -163,6 +169,9 @@ impl_parse!(TableFieldAttr {
     "set" => Set((= Ident)?),
     "custom_type" => CustomType(),
     "primary_key" => PrimaryKey(),
+    "allow_null" => AllowNull(= bool),
+    "auto_increment" => AutoIncrement(),
+    "unique" => Unique((= String)?),
     "default" => Default(= String)
 });
 

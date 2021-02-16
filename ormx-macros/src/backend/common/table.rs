@@ -40,7 +40,7 @@ fn sync_safe<B: Backend>(table: &Table<B>) -> TokenStream {
 
     let box_future = crate::utils::box_future();
     let sync_sql = format!(
-        "CREATE TABLE IF NOT EXISTS {quote}{}{quote} ({}){}{}{}",
+        "CREATE TABLE IF NOT EXISTS {quote}{}{quote} (\n{}\n){}{}{}",
         table.table,
         table.create_column_list(),
         table.engine.as_ref().map(|e| format!(" ENGINE={}", e)).unwrap_or_default(),

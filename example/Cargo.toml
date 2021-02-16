@@ -12,8 +12,9 @@ dotenv = "0.15"
 chrono = "0.4"
 simple_logger = "1"
 log = "0.4"
+uuid = { version = "0.8", features = ["v4"] }
 
 [dependencies.sqlx]
 version = "0.5"
 default-features = false
-features = ["macros", "mysql", "runtime-tokio-rustls", "chrono", "offline"]
+features = ["macros", "uuid", "mysql", "runtime-tokio-rustls", "chrono", "offline"]

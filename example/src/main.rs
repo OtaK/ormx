@@ -23,6 +23,7 @@ async fn main() -> anyhow::Result<()> {
 
     log::info!("insert a new row into the database");
     let mut new = InsertUser {
+        uuid: uuid::Uuid::new_v4().to_hyphenated(),
         first_name: "Moritz".to_owned(),
         last_name: "Bischof".to_owned(),
         email: "moritz.bischof1@gmail.com".to_owned(),
@@ -76,27 +77,40 @@ async fn main() -> anyhow::Result<()> {
 )]
 struct User {
     // map this field to the column "id"
-    #[ormx(column = "id")]
-    #[ormx(get_one = get_by_user_id)]
-    #[ormx(column_type = "INTEGER UNSIGNED", primary_key)]
+    #[ormx(
+        column = "id",
+        column_type = "INTEGER UNSIGNED",
+        primary_key,
+        auto_increment,
+        get_one = get_by_user_id
+    )]
     user_id: u32,
-    #[ormx(column_type = "VARCHAR(255) NOT NULL")]
+    #[ormx(
+        column_type = "CHAR(36)",
+        allow_null = false,
+        unique = "uuid_custom_unique_index",
+        custom_type,
+    )]
+    uuid: uuid::adapter::Hyphenated,
+    #[ormx(column_type = "VARCHAR(255)", allow_null = false)]
     first_name: String,
-    #[ormx(column_type = "VARCHAR(255) NOT NULL")]
+    #[ormx(column_type = "VARCHAR(255)", allow_null = false)]
     last_name: String,
     // generate `User::by_email(&str) -> Result<Option<Self>>`
-    #[ormx(get_optional(&str))]
-    #[ormx(column_type = "VARCHAR(255) NOT NULL")]
+    #[ormx(column_type = "VARCHAR(255)", unique, allow_null = false, get_optional(&str))]
     email: String,
-    #[ormx(custom_type)]
-    #[ormx(column_type = "ENUM('user', 'admin') NOT NULL DEFAULT 'user'")]
+    #[ormx(
+        column_type = "ENUM('user', 'admin')",
+        allow_null = false,
+        default = "'user'",
+        custom_type
+    )]
     role: Role,
-    #[ormx(column_type = "VARCHAR(255) DEFAULT NULL")]
+    #[ormx(column_type = "VARCHAR(255)", default = "NULL")]
     disabled: Option<String>,
     // don't include this field into `InsertUser` since it has a default value
     // generate `User::set_last_login(Option<NaiveDateTime>) -> Result<()>`
-    #[ormx(default = "NULL", set)]
-    #[ormx(column_type = "DATETIME")]
+    #[ormx(column_type = "DATETIME", default = "NULL", set)]
     last_login: Option<NaiveDateTime>,
 }
 
