@@ -11,9 +11,9 @@ license = "MIT"
 proc-macro = true
 
 [features]
-sqlite = []
-mysql = []
-postgres = []
+sqlite = ["sqlx-core/sqlite"]
+mysql = ["sqlx-core/mysql"]
+postgres = ["sqlx-core/postgres"]
 
 [dependencies]
 itertools = "0.10"
@@ -22,3 +22,4 @@ quote = "1"
 syn = { version = "1", features = ["full"] }
 once_cell = "1"
 proc-macro-error = "1"
+sqlx-core = { version = "0.5", default_features = false, features = ["any"] }

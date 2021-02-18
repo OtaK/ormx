@@ -1,3 +1,5 @@
+use std::marker::PhantomData;
+
 use syn::{
     Attribute, Ident, Path, Result, Token, Type,
     parse::{Parse, ParseStream},
@@ -24,6 +26,34 @@ pub enum TableAttr {
 pub struct Insertable {
     pub attrs: Vec<Attribute>,
     pub ident: Ident,
+}
+
+pub enum TableFieldDefaultValue<'q, L> where L: sqlx_core::encode::Encode<'q, sqlx_core::any::Any> {
+    LiteralValue(L),
+    LiteralSQL(String),
+    Deferred(fn() -> String),
+    None,
+    Unreachable(&'q PhantomData<L>),
+}
+
+impl<'q, L: sqlx_core::encode::Encode<'q, sqlx_core::any::Any>> sqlx_core::encode::Encode<'q, sqlx_core::any::Any> for TableFieldDefaultValue<'q, L> {
+    fn encode_by_ref(&self, buf: &mut sqlx_core::any::AnyArgumentBuffer) -> sqlx_core::encode::IsNull {
+        match self {
+            Self::LiteralValue(l) => {
+                l.encode_by_ref(buf)
+            },
+            Self::LiteralSQL(s) => {
+                <String as sqlx_core::encode::Encode<'q, sqlx_core::any::Any>>::encode_by_ref(&s, buf)
+            },
+            Self::Deferred(f) => {
+                let s = f();
+
+                <String as sqlx_core::encode::Encode<'q, sqlx_core::any::Any>>::encode_by_ref(&s, buf)
+            },
+            Self::None => sqlx_core::encode::IsNull::Yes,
+            Self::Unreachable(_) => unreachable!(),
+        }
+    }
 }
 
 pub enum TableFieldAttr {
