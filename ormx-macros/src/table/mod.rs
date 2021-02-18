@@ -1,4 +1,4 @@
-use std::{collections::HashMap, convert::{TryFrom}};
+use std::{collections::HashMap, convert::TryFrom};
 
 use itertools::Itertools;
 use proc_macro2::{Ident, Span, TokenStream};
@@ -12,21 +12,22 @@ use std::marker::PhantomData;
 
 mod parse;
 
-pub struct Table<B: Backend> {
+pub struct Table<D: sqlx::Database, B: Backend<D>> {
     pub ident: Ident,
     pub vis: Visibility,
     pub table: String,
-    pub id: TableField<B>,
-    pub fields: Vec<TableField<B>>,
+    pub id: TableField<D, B>,
+    pub fields: Vec<TableField<D, B>>,
     pub insertable: Option<Insertable>,
     pub engine: Option<String>,
     pub charset: Option<String>,
     pub collation: Option<String>,
     pub syncable: bool,
+    _phantom: PhantomData<D>,
 }
 
 #[derive(Clone)]
-pub struct TableField<B: Backend> {
+pub struct TableField<D: sqlx::Database, B: Backend<D>> {
     pub field: Ident,
     pub ty: Type,
     pub column_name: String,
@@ -42,20 +43,21 @@ pub struct TableField<B: Backend> {
     pub get_optional: Option<Getter>,
     pub get_many: Option<Getter>,
     pub set: Option<Ident>,
-    pub _phantom: PhantomData<*const B>,
+    _phantom: PhantomData<B>,
+    _phantom2: PhantomData<D>,
 }
 
-impl<B: Backend> Table<B> {
-    pub fn fields_except_id(&self) -> impl Iterator<Item = &TableField<B>> + Clone {
+impl<D: sqlx::Database, B: Backend<D>> Table<D, B> {
+    pub fn fields_except_id(&self) -> impl Iterator<Item = &TableField<D, B>> + Clone {
         let id = self.id.field.clone();
         self.fields.iter().filter(move |field| field.field != id)
     }
 
-    pub fn insertable_fields(&self) -> impl Iterator<Item = &TableField<B>> + Clone {
+    pub fn insertable_fields(&self) -> impl Iterator<Item = &TableField<D, B>> + Clone {
         self.fields_except_id().filter(|field| field.default.is_none())
     }
 
-    pub fn default_fields(&self) -> impl Iterator<Item = &TableField<B>> + Clone {
+    pub fn default_fields(&self) -> impl Iterator<Item = &TableField<D, B>> + Clone {
         self.fields.iter().filter(|field| field.default.is_some())
     }
 
@@ -103,7 +105,7 @@ impl<B: Backend> Table<B> {
     }
 }
 
-impl<B: Backend> TableField<B> {
+impl<D: sqlx::Database, B: Backend<D>> TableField<D, B> {
     pub fn fmt_for_select(&self) -> String {
         if self.custom_type {
             format!(
@@ -157,7 +159,7 @@ impl<B: Backend> TableField<B> {
 }
 
 impl Getter {
-    pub fn or_fallback<B: Backend>(&self, field: &TableField<B>) -> (Ident, Type) {
+    pub fn or_fallback<D: sqlx::Database, B: Backend<D>>(&self, field: &TableField<D, B>) -> (Ident, Type) {
         let ident = self
             .func
             .clone()
@@ -170,8 +172,8 @@ impl Getter {
     }
 }
 
-pub fn derive(input: DeriveInput) -> Result<TokenStream> {
-    let parsed = Table::try_from(&input)?;
+pub fn derive<D: sqlx::Database, B: Backend<D>>(input: DeriveInput) -> Result<TokenStream> {
+    let parsed: Table<D, B> = Table::try_from(&input)?;
 
     let impl_table = Implementation::impl_table(&parsed);
     let insert_struct = Implementation::insert_struct(&parsed);

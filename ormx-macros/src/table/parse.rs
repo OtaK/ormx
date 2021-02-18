@@ -14,7 +14,7 @@ macro_rules! none {
     ($($i:ident),*) => { $( let mut $i = None; )* };
 }
 
-impl<B: Backend> TryFrom<&syn::Field> for TableField<B> {
+impl<D: sqlx::Database, B: Backend<D>> TryFrom<&syn::Field> for TableField<D, B> {
     type Error = Error;
 
     fn try_from(value: &syn::Field) -> Result<Self> {
@@ -79,11 +79,12 @@ impl<B: Backend> TryFrom<&syn::Field> for TableField<B> {
             set,
             column_type,
             _phantom: PhantomData,
+            _phantom2: PhantomData,
         })
     }
 }
 
-impl<B: Backend> TryFrom<&syn::DeriveInput> for Table<B> {
+impl<D: sqlx::Database + Clone, B: Backend<D>> TryFrom<&syn::DeriveInput> for Table<D, B> {
     type Error = Error;
 
     fn try_from(value: &DeriveInput) -> Result<Self> {
@@ -120,14 +121,14 @@ impl<B: Backend> TryFrom<&syn::DeriveInput> for Table<B> {
         let id = id.ok_or_else(|| missing_attr("id"))?;
         let id = fields
             .iter()
+            .cloned()
             .find(|field| field.field == id)
             .ok_or_else(|| {
                 Error::new(
                     Span::call_site(),
                     "id does not refer to a field of the struct",
                 )
-            })?
-            .clone();
+            })?;
 
         if id.default.is_some() {
             return Err(Error::new(
@@ -154,6 +155,7 @@ impl<B: Backend> TryFrom<&syn::DeriveInput> for Table<B> {
             engine,
             charset,
             collation,
+            _phantom: PhantomData,
         })
     }
 }

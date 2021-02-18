@@ -7,7 +7,7 @@ use crate::table::Table;
 
 use super::MySqlBackend;
 
-pub fn impl_insert(table: &Table<MySqlBackend>) -> TokenStream {
+pub fn impl_insert(table: &Table<sqlx::MySql, MySqlBackend>) -> TokenStream {
     let insert_ident = match &table.insertable {
         Some(i) => &i.ident,
         None => return quote!(),

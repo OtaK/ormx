@@ -4,18 +4,18 @@ use quote::{TokenStreamExt, quote};
 use crate::backend::Backend;
 use crate::table::Table;
 
-pub fn impl_table<B: Backend>(table: &Table<B>) -> TokenStream {
+pub fn impl_table<D: sqlx::Database, B: Backend<D>>(table: &Table<D, B>) -> TokenStream {
     let table_ident = &table.ident;
     let id_ident = &table.id.field;
     let id_ty = &table.id.ty;
     let column_list = table.select_column_list();
 
-    let get = get::<B>(table, &column_list);
+    let get = get::<D, B>(table, &column_list);
     let stream_all = stream_all(table, &column_list);
-    let stream_all_paginated = stream_all_paginated::<B>(table, &column_list);
-    let update = update::<B>(table);
-    let delete = delete::<B>(table);
-    let sync_safe = sync_safe::<B>(table);
+    let stream_all_paginated = stream_all_paginated::<D, B>(table, &column_list);
+    let update = update::<D, B>(table);
+    let delete = delete::<D, B>(table);
+    let sync_safe = sync_safe::<D, B>(table);
 
     quote! {
         impl ormx::Table for #table_ident {
@@ -33,7 +33,7 @@ pub fn impl_table<B: Backend>(table: &Table<B>) -> TokenStream {
     }
 }
 
-fn sync_safe<B: Backend>(table: &Table<B>) -> TokenStream {
+fn sync_safe<D: sqlx::Database, B: Backend<D>>(table: &Table<D, B>) -> TokenStream {
     if !table.syncable {
         return TokenStream::default();
     }
@@ -64,7 +64,7 @@ fn sync_safe<B: Backend>(table: &Table<B>) -> TokenStream {
     }
 }
 
-fn get<B: Backend>(table: &Table<B>, column_list: &str) -> TokenStream {
+fn get<D: sqlx::Database, B: Backend<D>>(table: &Table<D, B>, column_list: &str) -> TokenStream {
     let box_future = crate::utils::box_future();
     let get_sql = format!(
         "SELECT {} FROM {quote}{}{quote} WHERE {} = {}",
@@ -89,7 +89,7 @@ fn get<B: Backend>(table: &Table<B>, column_list: &str) -> TokenStream {
     }
 }
 
-fn update<B: Backend>(table: &Table<B>) -> TokenStream {
+fn update<D: sqlx::Database, B: Backend<D>>(table: &Table<D, B>) -> TokenStream {
     let box_future = crate::utils::box_future();
     let mut bindings = B::Bindings::default();
     let mut assignments = vec![];
@@ -134,7 +134,7 @@ fn update<B: Backend>(table: &Table<B>) -> TokenStream {
     }
 }
 
-fn stream_all<B: Backend>(table: &Table<B>, column_list: &str) -> TokenStream {
+fn stream_all<D: sqlx::Database, B: Backend<D>>(table: &Table<D, B>, column_list: &str) -> TokenStream {
     let box_stream = crate::utils::box_stream();
     let all_sql = format!("SELECT {} FROM {}", column_list, table.table);
 
@@ -148,7 +148,7 @@ fn stream_all<B: Backend>(table: &Table<B>, column_list: &str) -> TokenStream {
     }
 }
 
-fn stream_all_paginated<B: Backend>(table: &Table<B>, column_list: &str) -> TokenStream {
+fn stream_all_paginated<D: sqlx::Database, B: Backend<D>>(table: &Table<D, B>, column_list: &str) -> TokenStream {
     let box_stream = crate::utils::box_stream();
     let mut bindings = B::Bindings::default();
     let all_sql = format!(
@@ -171,7 +171,7 @@ fn stream_all_paginated<B: Backend>(table: &Table<B>, column_list: &str) -> Toke
     }
 }
 
-fn delete<B: Backend>(table: &Table<B>) -> TokenStream {
+fn delete<D: sqlx::Database, B: Backend<D>>(table: &Table<D, B>) -> TokenStream {
     let box_future = crate::utils::box_future();
     let id_ty = &table.id.ty;
     let delete_sql = format!(

@@ -13,7 +13,7 @@ use crate::table::Table;
 
 mod table;
 
-pub(crate) fn getters<B: Backend>(table: &Table<B>) -> TokenStream {
+pub(crate) fn getters<D: sqlx::Database, B: Backend<D>>(table: &Table<D, B>) -> TokenStream {
     let column_list = table.select_column_list();
     let vis = &table.vis;
     let mut getters = TokenStream::new();
@@ -90,7 +90,7 @@ pub fn get_many(vis: &Visibility, ident: &Ident, by_ty: &Type, sql: &str) -> Tok
     }
 }
 
-pub fn setters<B: Backend>(table: &Table<B>) -> TokenStream {
+pub fn setters<D: sqlx::Database, B: Backend<D>>(table: &Table<D, B>) -> TokenStream {
     let vis = &table.vis;
     let mut setters = TokenStream::new();
 
@@ -132,7 +132,7 @@ pub fn setters<B: Backend>(table: &Table<B>) -> TokenStream {
     }
 }
 
-pub(crate) fn impl_patch<B: Backend>(patch: &Patch) -> TokenStream {
+pub(crate) fn impl_patch<D: sqlx::Database, B: Backend<D>>(patch: &Patch) -> TokenStream {
     let patch_ident = &patch.ident;
     let table_path = &patch.table;
     let field_idents = &patch
@@ -182,7 +182,7 @@ pub(crate) fn impl_patch<B: Backend>(patch: &Patch) -> TokenStream {
     }
 }
 
-pub(crate) fn insert_struct<B: Backend>(table: &Table<B>) -> TokenStream {
+pub(crate) fn insert_struct<D: sqlx::Database, B: Backend<D>>(table: &Table<D, B>) -> TokenStream {
     let Insertable { ident, attrs } = match &table.insertable {
         Some(i) => i,
         None => return quote!(),

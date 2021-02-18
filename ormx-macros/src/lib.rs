@@ -1,5 +1,12 @@
 #![cfg(any(feature = "mysql", feature = "postgres", feature = "sqlite"))]
 
+#[cfg(feature = "mysql")]
+type Database = sqlx::mysql::MySql;
+#[cfg(feature = "postgres")]
+type Database = sqlx::postgres::Postgres;
+#[cfg(feature = "sqlite")]
+type Database = sqlx::sqlite::Sqlite;
+
 mod attrs;
 mod backend;
 mod patch;
@@ -10,7 +17,7 @@ mod utils;
 /// to certain fields.
 ///
 /// # Example
-/// ```rust,ignore  
+/// ```rust,ignore
 /// #[derive(ormx::Table)]
 /// #[ormx(table = "users", id = user_id, insertable)]
 /// struct User {
@@ -51,7 +58,7 @@ mod utils;
 /// `#[ormx(get_optional)]` and `#[ormx(get_many)]`. These functions can be used to query a row by
 /// the value of the annotated field.
 ///
-/// The generated function will have these signature:  
+/// The generated function will have these signature:
 /// `#[ormx(get_one)]`:
 /// `{pub} async fn get_by_{field_name}(&{field_type}) -> Result<Self>`
 ///
@@ -70,8 +77,8 @@ mod utils;
 /// ormx will generate accessor functions for fields annotated with `#[ormx(set)]`.
 /// These functions can be used to update a single field of an entity.
 ///
-/// The generated function will have these signature:  
-/// `#[ormx(set)]`: `{pub} async fn set_{field_name}(&mut self, {field_type}) -> Result<Self>`  
+/// The generated function will have these signature:
+/// `#[ormx(set)]`: `{pub} async fn set_{field_name}(&mut self, {field_type}) -> Result<Self>`
 ///
 /// By default, the function will be named `set_{field_name)`, though this can be changed by
 /// supplying a custom name: `#[ormx(set = set_name)]`.
@@ -85,7 +92,8 @@ mod utils;
 #[proc_macro_derive(Table, attributes(ormx))]
 pub fn derive_table(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let input = syn::parse_macro_input!(input as syn::DeriveInput);
-    match table::derive(input) {
+
+    match table::derive::<Database, backend::Implementation>(input) {
         Ok(ok) => ok,
         Err(err) => err.to_compile_error(),
     }

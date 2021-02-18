@@ -6,7 +6,7 @@ use syn::Ident;
 use crate::backend::postgres::{PgBackend, PgBindings};
 use crate::table::{Table, TableField};
 
-fn insert_sql(table: &Table<PgBackend>, insert_fields: &[&TableField<PgBackend>]) -> String {
+fn insert_sql(table: &Table<sqlx::Postgres, PgBackend>, insert_fields: &[&TableField<sqlx::Postgres, PgBackend>]) -> String {
     format!(
         "INSERT INTO {} ({}) VALUES ({}) RETURNING {}",
         table.table,
@@ -17,8 +17,8 @@ fn insert_sql(table: &Table<PgBackend>, insert_fields: &[&TableField<PgBackend>]
 }
 
 fn query_default_sql(
-    table: &Table<PgBackend>,
-    default_fields: &[&TableField<PgBackend>],
+    table: &Table<sqlx::Postgres, PgBackend>,
+    default_fields: &[&TableField<sqlx::Postgres, PgBackend>],
 ) -> String {
     format!(
         "SELECT {} FROM {} WHERE {} = {}",
@@ -32,14 +32,14 @@ fn query_default_sql(
     )
 }
 
-pub fn impl_insert(table: &Table<PgBackend>) -> TokenStream {
+pub fn impl_insert(table: &Table<sqlx::Postgres, PgBackend>) -> TokenStream {
     let insert_ident = match &table.insertable {
         Some(i) => &i.ident,
         None => return quote!(),
     };
 
-    let insert_fields: Vec<&TableField<PgBackend>> = table.insertable_fields().collect();
-    let default_fields: Vec<&TableField<PgBackend>> = table.default_fields().collect();
+    let insert_fields: Vec<&TableField<sqlx::Postgres, PgBackend>> = table.insertable_fields().collect();
+    let default_fields: Vec<&TableField<sqlx::Postgres, PgBackend>> = table.default_fields().collect();
 
     let id_ident = &table.id.field;
     let table_ident = &table.ident;
