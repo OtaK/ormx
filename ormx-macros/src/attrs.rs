@@ -28,28 +28,22 @@ pub struct Insertable {
     pub ident: Ident,
 }
 
-pub enum TableFieldDefaultValue<'q, L> where L: sqlx_core::encode::Encode<'q, sqlx_core::any::Any> {
-    LiteralValue(L),
+pub enum TableFieldDefaultValue<'q, Output = &'q dyn sqlx_core::encode::Encode<'q, sqlx_core::any::Any>> {
+    LiteralValue(Output),
     LiteralSQL(String),
-    Deferred(fn() -> String),
+    //Deferred(fn() -> Output),
     None,
-    Unreachable(&'q PhantomData<L>),
+    Unreachable(&'q PhantomData<Output>),
 }
 
 impl<'q, L: sqlx_core::encode::Encode<'q, sqlx_core::any::Any>> sqlx_core::encode::Encode<'q, sqlx_core::any::Any> for TableFieldDefaultValue<'q, L> {
-    fn encode_by_ref(&self, buf: &mut sqlx_core::any::AnyArgumentBuffer) -> sqlx_core::encode::IsNull {
+    fn encode_by_ref(&self, buf: &mut sqlx_core::any::AnyArgumentBuffer<'q>) -> sqlx_core::encode::IsNull {
         match self {
-            Self::LiteralValue(l) => {
-                l.encode_by_ref(buf)
-            },
+            Self::LiteralValue(l) => l.encode_by_ref(buf),
             Self::LiteralSQL(s) => {
                 <String as sqlx_core::encode::Encode<'q, sqlx_core::any::Any>>::encode_by_ref(&s, buf)
             },
-            Self::Deferred(f) => {
-                let s = f();
-
-                <String as sqlx_core::encode::Encode<'q, sqlx_core::any::Any>>::encode_by_ref(&s, buf)
-            },
+            //Self::Deferred(f) => f().encode_by_ref(buf),
             Self::None => sqlx_core::encode::IsNull::Yes,
             Self::Unreachable(_) => unreachable!(),
         }
@@ -129,6 +123,14 @@ impl Parse for Insertable {
     }
 }
 
+impl Parse for TableFieldDefaultValue<'_> {
+    fn parse(input: ParseStream) -> Result<Self> {
+
+        // TODO:
+        todo!()
+    }
+}
+
 pub fn parse_attrs<A: Parse>(attrs: &[Attribute]) -> Result<Vec<A>> {
     let attrs = attrs
         .iter()
@@ -202,7 +204,7 @@ impl_parse!(TableFieldAttr {
     "allow_null" => AllowNull(= bool),
     "auto_increment" => AutoIncrement(),
     "unique" => Unique((= String)?),
-    "default" => Default(= String)
+    "default" => Default(= TableFieldDefaultValue)
 });
 
 impl_parse!(PatchAttr {
