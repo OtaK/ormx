@@ -42,6 +42,8 @@ pub mod exports {
     pub use futures;
 }
 
+pub mod args;
+
 #[cfg(any(feature = "mysql", feature = "postgres"))]
 mod query2;
 
@@ -163,7 +165,7 @@ where
     type Table: Table;
 
     /// Applies the data of this patch to the given entity.
-    /// This does not persist the change in the database.  
+    /// This does not persist the change in the database.
     fn apply_to(self, entity: &mut Self::Table);
 
     /// Applies this patch to a row in the database.
