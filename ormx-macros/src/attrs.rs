@@ -31,6 +31,8 @@ pub enum TableFieldAttr {
     Column(String),
     /// column_type = <string>
     ColumnType(String),
+    /// comment = <string>
+    Comment(String),
     /// custom_type
     CustomType(()),
     /// primary_key
@@ -162,6 +164,7 @@ impl_parse!(TableAttr {
 
 impl_parse!(TableFieldAttr {
     "column" => Column(= String),
+    "comment" => Comment(= String),
     "column_type" => ColumnType(= String),
     "get_one" => GetOne(Getter),
     "get_optional" => GetOptional(Getter),

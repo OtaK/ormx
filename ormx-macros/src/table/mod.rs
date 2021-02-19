@@ -31,6 +31,7 @@ pub struct TableField<B: Backend> {
     pub ty: Type,
     pub column_name: String,
     pub column_type: Option<String>,
+    pub comment: Option<String>,
     pub primary: bool,
     pub auto_increment: bool,
     pub allow_null: bool,

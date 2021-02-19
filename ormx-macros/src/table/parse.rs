@@ -30,6 +30,7 @@ impl<B: Backend> TryFrom<&syn::Field> for TableField<B> {
 
         none!(
             column,
+            comment,
             column_type,
             custom_type,
             primary,
@@ -47,6 +48,7 @@ impl<B: Backend> TryFrom<&syn::Field> for TableField<B> {
             match attr {
                 TableFieldAttr::Column(c) => set_once(&mut column, c)?,
                 TableFieldAttr::ColumnType(c) => set_once(&mut column_type, c)?,
+                TableFieldAttr::Comment(c) => set_once(&mut comment, c)?,
                 TableFieldAttr::CustomType(_) => set_once(&mut custom_type, true)?,
                 TableFieldAttr::PrimaryKey(_) => set_once(&mut primary, true)?,
                 TableFieldAttr::AllowNull(allow ) => set_once(&mut allow_null, allow)?,
@@ -70,6 +72,7 @@ impl<B: Backend> TryFrom<&syn::Field> for TableField<B> {
             primary: primary.unwrap_or_default(),
             auto_increment: auto_increment.unwrap_or_default(),
             allow_null: allow_null.unwrap_or_else(|| !primary.unwrap_or_default()),
+            comment,
             unique,
             reserved_ident,
             default,
