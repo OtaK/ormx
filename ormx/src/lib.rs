@@ -55,6 +55,7 @@ pub type Db = sqlx::Postgres;
 pub type Db = sqlx::Sqlite;
 
 /// A database table in which each row is identified by a unique ID.
+#[async_trait::async_trait]
 pub trait Table
 where
     Self: Sized + Send + Sync + 'static,
@@ -66,94 +67,94 @@ where
     fn id(&self) -> Self::Id;
 
     /// Insert a row into the database.
-    fn insert(
+    async fn insert(
         db: &mut <Db as Database>::Connection,
         row: impl Insert<Table = Self>,
-    ) -> BoxFuture<Result<Self>> {
-        row.insert(db)
+    ) -> Result<Self> {
+        row.insert(db).await?
     }
 
     /// Queries the row of the given id.
-    fn get<'a, 'c: 'a>(
+    async fn get<'a, 'c: 'a>(
         db: impl Executor<'c, Database = Db> + 'a,
         id: Self::Id,
-    ) -> BoxFuture<'a, Result<Self>>;
+    ) -> Result<Self>;
 
     /// Stream all rows from this table.
-    fn stream_all<'a, 'c: 'a>(
+    async fn stream_all<'a, 'c: 'a>(
         db: impl Executor<'c, Database = Db> + 'a,
-    ) -> BoxStream<'a, Result<Self>>;
+    ) -> Result<Self>;
 
-    fn stream_all_paginated<'a, 'c: 'a>(
+    async fn stream_all_paginated<'a, 'c: 'a>(
         db: impl Executor<'c, Database = Db> + 'a,
         offset: i64,
         limit: i64,
-    ) -> BoxStream<'a, Result<Self>>;
+    ) -> Result<Self>;
 
     /// Load all rows from this table.
-    fn all<'a, 'c: 'a>(
+    async fn all<'a, 'c: 'a>(
         db: impl Executor<'c, Database = Db> + 'a,
-    ) -> BoxFuture<'a, Result<Vec<Self>>> {
-        use futures::TryStreamExt;
-
-        Box::pin(Self::stream_all(db).try_collect())
+    ) -> Result<Vec<Self>> {
+        Self::stream_all(db).await?.collect()
     }
 
-    fn all_paginated<'a, 'c: 'a>(
+    async fn all_paginated<'a, 'c: 'a>(
         db: impl Executor<'c, Database = Db> + 'a,
         offset: i64,
         limit: i64,
-    ) -> BoxFuture<'a, Result<Vec<Self>>> {
-        use futures::TryStreamExt;
-
-        Box::pin(Self::stream_all_paginated(db, offset, limit).try_collect())
+    ) -> Result<Vec<Self>> {
+        Self::stream_all_paginated(db, offset, limit).await?.collect()
     }
     /// Applies a patch to this row.
-    fn patch<'a, 'c: 'a, P>(
+    async fn patch<'a, 'c: 'a, P>(
         &'a mut self,
         db: impl Executor<'c, Database = Db> + 'a,
         patch: P,
-    ) -> BoxFuture<'a, Result<()>>
+    ) -> Result<()>
     where
         P: Patch<Table = Self>,
     {
-        Box::pin(async move {
-            let patch: P = patch;
-            patch.patch_row(db, self.id()).await?;
-            patch.apply_to(self);
-            Ok(())
-        })
+        let patch: P = patch;
+        patch.patch_row(db, self.id()).await?;
+        patch.apply_to(self);
+        Ok(())
     }
 
     /// Updates all fields of this row, regardless if they have been changed or not.
-    fn update<'a, 'c: 'a>(
+    async fn update<'a, 'c: 'a>(
         &'a self,
         db: impl Executor<'c, Database = Db> + 'a,
-    ) -> BoxFuture<'a, Result<()>>;
+    ) -> Result<()>;
 
     // Refresh this row, querying all columns from the database.
-    fn reload<'a, 'c: 'a>(
+    async fn reload<'a, 'c: 'a>(
         &'a mut self,
         db: impl Executor<'c, Database = Db> + 'a,
-    ) -> BoxFuture<'a, Result<()>> {
-        Box::pin(async move {
-            *self = Self::get(db, self.id()).await?;
-            Ok(())
-        })
+    ) -> Result<()> {
+        *self = Self::get(db, self.id()).await?;
+        Ok(())
     }
 
     /// Delete a row from the database
-    fn delete_row<'a, 'c: 'a>(
+    async fn delete_row<'a, 'c: 'a>(
         db: impl Executor<'c, Database = Db> + 'a,
         id: Self::Id,
-    ) -> BoxFuture<'a, Result<()>>;
+    ) -> Result<()>;
 
     /// Deletes this row from the database.
-    fn delete<'a, 'c: 'a>(
+    async fn delete<'a, 'c: 'a>(
         self,
         db: impl Executor<'c, Database = Db> + 'a,
-    ) -> BoxFuture<'a, Result<()>> {
-        Self::delete_row(db, self.id())
+    ) -> Result<()> {
+        Self::delete_row(db, self.id()).await?;
+        Ok(())
+    }
+}
+
+#[async_trait::async_trait]
+pub trait FindableTable: Table {
+    async fn find_all(args: QueryArgs) -> Vec<Self> {
+        todo!()
     }
 }
 

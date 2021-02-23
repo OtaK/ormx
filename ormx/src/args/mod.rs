@@ -6,11 +6,10 @@ pub use self::op::*;
 mod hints;
 pub use self::hints::*;
 
-#[derive(Debug)]
-pub enum WhereValue {
-    // Switch to sqlx::Encode
-    Literal(Box<dyn sqlx::Encode>),
-    Alternatives(Vec<Box<dyn sqlx::Encode>>),
+#[derive(Debug, Clone)]
+pub enum WhereValue<'a> {
+    Literal(Box<dyn sqlx::Encode<'a, sqlx::Any>>),
+    Alternatives(Vec<Box<dyn sqlx::Encode<'a, sqlx::Any>>>),
 }
 
 #[derive(Debug, Clone)]
@@ -20,21 +19,24 @@ pub struct AttributesValue {
     pub exclude: Vec<String>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct AssociationArg {}
 
-#[derive(Debug, sqlx::Type)]
+#[derive(Debug, Clone, Copy, sqlx::Type)]
 #[sqlx(rename_all = "UPPERCASE")]
 pub enum OrderType {
     Desc,
     Asc,
 }
 
-#[derive(Debug, Clone)]
-pub struct QueryArgs {
-    where_opts: std::collections::HashMap<String, (Operator, WhereValue)>,
+pub type WhereOpts<'a> = std::collections::HashMap<String, (Operator, WhereValue<'a>)>;
+
+#[derive(Debug, Default, Clone)]
+pub struct QueryArgs<'a> {
+    where_opts: WhereOpts<'a>,
     attributes: AttributesValue,
     include: Vec<AssociationArg>,
-    // Maybe btreemap? We need to keep order of insertion
     order: Vec<(String, OrderType)>,
+    transaction: Option<sqlx::Transaction<'a, sqlx::Any>>,
+    having: WhereOpts<'a>,
 }
